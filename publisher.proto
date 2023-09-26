@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+service Publisher {
+    rpc PublishMessage (PublishRequest) returns (PublishResponse);
+}
+
+message PublishRequest {
+    string topic = 1;
+    string content = 2;
+}
+
+message PublishResponse {
+    bool is_success = 1;
+}

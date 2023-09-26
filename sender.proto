@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+service Sender {
+    rpc SendMessage (SendRequest) returns (SendResponse);
+}
+
+message SendRequest {
+    string topic = 1;
+    string content = 2;
+}
+
+message SendResponse {
+    bool is_success = 1;
+}
