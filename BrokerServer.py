@@ -30,18 +30,18 @@ def worker_messages():
                 continue
 
             for conn in connections:
-                subscriber_sender = threading.Thread(target=send_message, args=(payload.content, conn.host, conn.port))
+                subscriber_sender = threading.Thread(target=send_message, args=(conn.host, conn.port, payload.content))
                 subscriber_sender.start()
 
             PayloadRepository.delete(payload)
 
 
 def send_message(host, port, content):
-    time.sleep(2)
+    print(f"Sending (message:{content}) to: {host}:{port}")
     channel = grpc.insecure_channel(f"{host}:{port}")
     stub = sender_pb2_grpc.SenderStub(channel)
 
-    request = sender_pb2.SendRequest(message="CONNECTED")
+    request = sender_pb2.SendRequest(message=content)
 
     response = stub.SendMessage(request)
 
@@ -65,9 +65,6 @@ class SubscriberService(subscriber_pb2_grpc.SubscriberServicer):
     def Subscribe(self, request, context):
         print(f"Received from Subscriber:\n {request}")
 
-        subscriber_thread = threading.Thread(target=send_message, args=(request.topic, request.host, request.port))
-        subscriber_thread.start()
-
         response = subscriber__pb2.SubscribeResponse(is_success=True)
         return response
 
@@ -78,11 +75,12 @@ publisher_pb2_grpc.add_PublisherServicer_to_server(PublisherServicer(), server)
 
 print(f"Starting server. Listening on port {settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}.")
 
-# worker_thread = threading.Thread(target=worker_messages)
-# worker_thread.start()
+worker_thread = threading.Thread(target=worker_messages)
+worker_thread.start()
 
 server.add_insecure_port(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}")
 server.start()
-server.wait_for_termination()
 
-# worker_thread.join()
+# server.wait_for_termination()
+
+worker_thread.join()

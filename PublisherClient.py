@@ -5,6 +5,7 @@ import settings
 from PayloadRepository import PayloadRepository
 
 channel = grpc.insecure_channel(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}")
+channel = grpc.secure_channel(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}", grpc.ssl_server_credentials())
 client = publisher_pb2_grpc.PublisherStub(channel)
 
 while True:

@@ -31,7 +31,7 @@ stub = subscriber_pb2_grpc.SubscriberStub(channel)
 
 topic = input("\nEnter the topic to subscribe: ")
 
-request = subscriber__pb2.SubscribeRequest(topic=topic, host=host, port=port)
+request = subscriber__pb2.SubscribeRequest(topic=topic, host="localhost", port=port)
 
 response = stub.Subscribe(request)
 
@@ -48,11 +48,6 @@ if response.is_success:
     except Exception as e:
         ConnectionRepository.delete_by_host_port(address=(host, port))
         print(f"Error on subscriber: {e}")
-
-    # The server start() method is non-blocking. A new thread will be instantiated to handle requests.
-    # The thread calling server.start() will often not have any other work to do in the meantime.
-    # In this case, you can call server.wait_for_termination()
-    # to cleanly block the calling thread until the server terminates.
 
 else:
     print("Subscribe failed.")
