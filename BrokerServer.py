@@ -1,4 +1,5 @@
 import threading
+import time
 from concurrent import futures
 
 import grpc
@@ -10,28 +11,44 @@ import sender_pb2_grpc
 import settings
 import subscriber_pb2 as subscriber__pb2
 import subscriber_pb2_grpc
+from ConnectionRepository import ConnectionRepository
+from PayloadRepository import PayloadRepository
 
 
-def send_message(topic, host, port):
-    # asta e lucrul pentru worker
-    # scot payloads, in baza la payload.topic scot connections si deja
-    # fac SendRequest(content=)
-    # fara topic
+def worker_messages():
+    while True:
+        time.sleep(5)
+        print("Worker messages started:\n")
 
+        payloads = PayloadRepository.load()
+
+        for payload in payloads:
+            topic = payload.topic
+            connections = ConnectionRepository.get_by_topic(topic=topic)
+
+            if not connections.count():
+                continue
+
+            for conn in connections:
+                subscriber_sender = threading.Thread(target=send_message, args=(payload.content, conn.host, conn.port))
+                subscriber_sender.start()
+
+            PayloadRepository.delete(payload)
+
+
+def send_message(host, port, content):
+    time.sleep(2)
     channel = grpc.insecure_channel(f"{host}:{port}")
     stub = sender_pb2_grpc.SenderStub(channel)
 
-    # Create a request message
-    request = sender_pb2.SendRequest(content=f"Content based on topic")
+    request = sender_pb2.SendRequest(message="CONNECTED")
 
-    # Send the request to the server
     response = stub.SendMessage(request)
 
-    # Process the response from the server
     if response.is_success:
-        print("Message successfully delivered.")
+        print(f"Message successfully delivered to subscriber ({host}:{port}).")
     else:
-        print("Failed to deliver message.")
+        print(f"Failed to deliver message to subscriber ({host}:{port}).")
 
     return response
 
@@ -55,23 +72,17 @@ class SubscriberService(subscriber_pb2_grpc.SubscriberServicer):
         return response
 
 
-
-class SenderService(sender_pb2_grpc.SenderServicer):
-    def SendMessage(self, request, context):
-        print(f"Received notification from Subscriber:\n {request}")
-
-        response = sender_pb2.SendResponse(is_success=True)
-
-        return response
-
-
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 subscriber_pb2_grpc.add_SubscriberServicer_to_server(SubscriberService(), server)
 publisher_pb2_grpc.add_PublisherServicer_to_server(PublisherServicer(), server)
-sender_pb2_grpc.add_SenderServicer_to_server(SenderService(), server)
 
 print(f"Starting server. Listening on port {settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}.")
+
+# worker_thread = threading.Thread(target=worker_messages)
+# worker_thread.start()
 
 server.add_insecure_port(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}")
 server.start()
 server.wait_for_termination()
+
+# worker_thread.join()

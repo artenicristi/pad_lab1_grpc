@@ -5,8 +5,7 @@ service Sender {
 }
 
 message SendRequest {
-    string topic = 1;
-    string content = 2;
+    string message = 1;
 }
 
 message SendResponse {
