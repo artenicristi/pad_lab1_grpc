@@ -7,17 +7,22 @@ import publisher_pb2 as publisher__pb2
 import publisher_pb2_grpc
 import sender_pb2
 import sender_pb2_grpc
+import settings
 import subscriber_pb2 as subscriber__pb2
 import subscriber_pb2_grpc
 
 
 def send_message(topic, host, port):
-    print(f"Request from Subscriber:\n {topic} ++ {host} ++ {port}")
-    channel = grpc.insecure_channel(f"{host}:{port}")  # Connect to the server on the specified port
+    # asta e lucrul pentru worker
+    # scot payloads, in baza la payload.topic scot connections si deja
+    # fac SendRequest(content=)
+    # fara topic
+
+    channel = grpc.insecure_channel(f"{host}:{port}")
     stub = sender_pb2_grpc.SenderStub(channel)
 
     # Create a request message
-    request = sender_pb2.SendRequest(content=f"Hello, Subscriber:{port} from Broker!")
+    request = sender_pb2.SendRequest(content=f"Content based on topic")
 
     # Send the request to the server
     response = stub.SendMessage(request)
@@ -33,41 +38,40 @@ def send_message(topic, host, port):
 
 class PublisherServicer(publisher_pb2_grpc.PublisherServicer):
     def PublishMessage(self, request, context):
-        # Implement your logic to process the request here.
-        # You can access the request parameters like request.topic and request.content.
-        # You should also create a response using publisher_pb2.PublishResponse.
-        print(f"Received from Publisher: {request}")
+        print(f"Received from Publisher:\n {request}")
 
-        # Example response:
         response = publisher__pb2.PublishResponse(is_success=True)
         return response
 
 
 class SubscriberService(subscriber_pb2_grpc.SubscriberServicer):
     def Subscribe(self, request, context):
-        # Implement your logic here to handle the Subscribe request.
-        # 'request' contains the data sent by the client.
+        print(f"Received from Subscriber:\n {request}")
 
-        # For example, you can print the received topic, host, and port.
-        print(f"Received Subscribe: {request}")
-
-        # asta trebuie sa fac in worker
         subscriber_thread = threading.Thread(target=send_message, args=(request.topic, request.host, request.port))
         subscriber_thread.start()
 
-        # You can construct and return a response message.
         response = subscriber__pb2.SubscribeResponse(is_success=True)
         return response
 
 
 
+class SenderService(sender_pb2_grpc.SenderServicer):
+    def SendMessage(self, request, context):
+        print(f"Received notification from Subscriber:\n {request}")
+
+        response = sender_pb2.SendResponse(is_success=True)
+
+        return response
+
+
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 subscriber_pb2_grpc.add_SubscriberServicer_to_server(SubscriberService(), server)
 publisher_pb2_grpc.add_PublisherServicer_to_server(PublisherServicer(), server)
+sender_pb2_grpc.add_SenderServicer_to_server(SenderService(), server)
 
-print('Starting server. Listening on port 50051.')
-# server.add_insecure_port('[::]:50051')  # Replace with your desired server address and port.
-# de vazut cum de facut bind sau ce hosturi accepta
-server.add_insecure_port('localhost:50051')  # Replace with your desired server address and port.
+print(f"Starting server. Listening on port {settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}.")
+
+server.add_insecure_port(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}")
 server.start()
 server.wait_for_termination()

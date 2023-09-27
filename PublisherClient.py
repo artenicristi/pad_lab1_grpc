@@ -1,20 +1,27 @@
 import grpc
 import publisher_pb2 as publisher__pb2
 import publisher_pb2_grpc
+import settings
+from PayloadRepository import PayloadRepository
 
-channel = grpc.insecure_channel('localhost:50051')  # Replace with your server address and port.
+channel = grpc.insecure_channel(f"{settings.Settings.BROKER_HOST}:{settings.Settings.BROKER_PORT}")
 client = publisher_pb2_grpc.PublisherStub(channel)
 
-# Create a request
-request = publisher__pb2.PublishRequest(topic='your_topic', content='your_content')
+while True:
+    topic = input("\nEnter topic: ").lower().strip()
+    content = input("Enter content: ")
+    request = publisher__pb2.PublishRequest(topic=topic, content=content)
 
-# Make a gRPC request
-response = client.PublishMessage(request)
+    response = client.PublishMessage(request)
 
-# Process the response
-if response.is_success:
-    print('Message published successfully')
-else:
-    print('Message publication failed')
+    if response.is_success:
+        PayloadRepository.add(PayloadRepository.CONTENT, topic, content)
+        print("Message published successfully\n")
+    else:
+        print("Message publication failed\n")
+
+    input("Press enter to add new message")
+
+
 
 
